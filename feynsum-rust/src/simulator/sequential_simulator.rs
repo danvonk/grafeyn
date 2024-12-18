@@ -61,7 +61,11 @@ pub fn run<B: BasisIdx>(config: &Config, circuit: Circuit<B>) -> State<B> {
         ));
 
         let density = {
-            let max_num_states: u64 = 1 << num_qubits;
+            let max_num_states: u128 = match num_qubits >= 128 {
+                true => u128::MAX,
+                false => 1 << num_qubits,
+            };
+
             num_nonzeros as Real / max_num_states as Real
         };
 
@@ -86,7 +90,11 @@ pub fn run<B: BasisIdx>(config: &Config, circuit: Circuit<B>) -> State<B> {
     });
 
     let final_density = {
-        let max_num_states: u64 = 1 << num_qubits;
+        let max_num_states: u128 = match num_qubits >= 128 {
+            true => u128::MAX,
+            false => 1 << num_qubits,
+        };
+
         num_nonzeros as Real / max_num_states as Real
     };
 

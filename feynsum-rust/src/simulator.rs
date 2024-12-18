@@ -43,10 +43,13 @@ pub fn expected_cost(
     num_nonzeros: usize,
     prev_num_nonzeros: usize,
 ) -> (Real, usize) {
-    let max_num_states = 1 << num_qubits;
+    let max_num_states: u128 = match num_qubits >= 128 {
+        true => u128::MAX,
+        false => 1 << num_qubits,
+    };
     let rate = Real::max(1.0, num_nonzeros as Real / prev_num_nonzeros as Real);
     let expected_num_nonzeros =
-        cmp::min(max_num_states, (rate * num_nonzeros as Real) as i64) as usize;
+        cmp::min(max_num_states, (rate * num_nonzeros as Real) as u128) as usize;
     let expected_density = expected_num_nonzeros as Real / max_num_states as Real;
     let current_density = num_nonzeros as Real / max_num_states as Real;
 

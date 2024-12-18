@@ -25,7 +25,7 @@ impl<B: BasisIdx> Compactifiable<B> for State {
 }
 
 pub fn run<B: BasisIdx>(config: &Config, circuit: Circuit<B>) -> State {
-    let dim = 1 << circuit.num_qubits;
+    let dim = 1 << circuit.num_qubits;  // TODO - Fix Shift Overflow Error - no easy workaround?
 
     let mut gate_scheduler = gate_scheduler::create_gate_scheduler(config, &circuit);
 
