@@ -30,7 +30,7 @@ impl FromStr for GateSchedulingPolicy {
             "greedy-nonbranching" | "gnb" => Ok(GateSchedulingPolicy::GreedyNonbranching),
             "greedy-finish-qubit" | "gfq" => Ok(GateSchedulingPolicy::GreedyFinishQubit),
             _ => Err(format!(
-                "unknown gate scheduling policy: {}; valid values are: naive, gnb",
+                "unknown gate scheduling policy: {}; valid values are: naive, gnb, fgq",
                 s
             )),
         }
