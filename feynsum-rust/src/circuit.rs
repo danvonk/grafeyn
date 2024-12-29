@@ -187,6 +187,22 @@ impl<B: BasisIdx> Circuit<B> {
     pub fn num_gates(&self) -> usize {
         self.gates.len()
     }
+
+    /// Decompose 3 (or more) qubit gates for MPS simulation
+    pub fn decompose(&mut self) -> Self {
+        let new_gates: Vec<Gate<B>> = self
+            .gates
+            .iter_mut()
+            .flat_map(|g| g.defn.decompose_gate())
+            .map(|gdef| Gate::<B>::new(gdef))
+            .collect();
+        let num_qubits = self.num_qubits;
+
+        Circuit {
+            num_qubits,
+            gates: new_gates,
+        }
+    }
 }
 
 fn eval(exp: Expression) -> Result<Real, CircuitBuildError> {

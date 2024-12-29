@@ -43,8 +43,12 @@ fn main() -> io::Result<()> {
     log::info!("gate scheduling policy: {}", options.gate_schduling_policy);
     log::info!("dense threshold: {}", options.dense_threshold);
     log::info!("pull threshold: {}", options.pull_threshold);
-    log::info!("parallelism: {}", options.parallelism);
+    log::info!("parallelism: {} threads", options.parallelism);
     log::info!("block size: {}", options.block_size);
+    log::info!(
+        "bond dimension threshold: {}",
+        options.bond_dimension_threshold
+    );
 
     let source = fs::read_to_string(&options.input)?;
 
@@ -77,7 +81,8 @@ fn build_circuit_and_run<B: BasisIdx, AB: AtomicBasisIdx<B>>(
         Err(err) => {
             panic!("Failed to construct circuit: {:?}", err);
         }
-    };
+    }
+    .decompose();
 
     log::info!("circuit construction complete. starting simulation");
 
@@ -118,6 +123,10 @@ fn run<B: BasisIdx, AB: AtomicBasisIdx<B>>(
         Simulator::Hybrid => {
             log::info!("using hybrid simulator");
             simulator::hybrid_simulator::run::<B, AB>(&config, circuit)
+        }
+        Simulator::MPS => {
+            log::info!("using MPS simulator");
+            simulator::mps_simulator::run::<B>(&config, circuit).compactify()
         }
     }
 }

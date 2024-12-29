@@ -24,7 +24,7 @@ enum BranchingType {
     MaybeBranching,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum GateDefn {
     CCX {
@@ -597,6 +597,437 @@ impl GateDefn {
             GateDefn::Other { .. } => unimplemented!(),
         }
     }
+
+    // pub fn gate_to_matrix(&self) -> Option<Array2<Complex>> {
+    //     match *self {
+    //         GateDefn::X(_) => Some(
+    //             Array2::<Complex>::from_shape_vec(
+    //                 (2, 2),
+    //                 vec![
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(1.0, 0.0),
+    //                     Complex::new(1.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                 ],
+    //             )
+    //             .unwrap(),
+    //         ),
+    //         GateDefn::PauliY(_) => Some(
+    //             Array2::<Complex>::from_shape_vec(
+    //                 (2, 2),
+    //                 vec![
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, -1.0),
+    //                     Complex::new(0.0, 1.0),
+    //                     Complex::new(0.0, 0.0),
+    //                 ],
+    //             )
+    //             .unwrap(),
+    //         ),
+    //         GateDefn::PauliZ(_) => Some(
+    //             Array2::<Complex>::from_shape_vec(
+    //                 (2, 2),
+    //                 vec![
+    //                     Complex::new(1.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(-1.0, 0.0),
+    //                 ],
+    //             )
+    //             .unwrap(),
+    //         ),
+    //         GateDefn::S(_) => Some(
+    //             Array2::<Complex>::from_shape_vec(
+    //                 (2, 2),
+    //                 vec![
+    //                     Complex::new(1.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 1.0),
+    //                 ],
+    //             )
+    //             .unwrap(),
+    //         ),
+    //         GateDefn::Sdg(_) => Some(
+    //             Array2::<Complex>::from_shape_vec(
+    //                 (2, 2),
+    //                 vec![
+    //                     Complex::new(1.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 1.0),
+    //                 ],
+    //             )
+    //             .unwrap(),
+    //         ),
+    //         GateDefn::Phase { rot, .. } => Some(
+    //             Array2::<Complex>::from_shape_vec(
+    //                 (2, 2),
+    //                 vec![
+    //                     Complex::new(1.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::from_polar(1.0, rot),
+    //                 ],
+    //             )
+    //             .unwrap(),
+    //         ),
+    //         GateDefn::T(_) => Some(
+    //             Array2::<Complex>::from_shape_vec(
+    //                 (2, 2),
+    //                 vec![
+    //                     Complex::new(1.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(constants::RECP_SQRT_2, constants::RECP_SQRT_2),
+    //                 ],
+    //             )
+    //             .unwrap(),
+    //         ),
+    //         GateDefn::Tdg(_) => Some(
+    //             Array2::<Complex>::from_shape_vec(
+    //                 (2, 2),
+    //                 vec![
+    //                     Complex::new(1.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(constants::RECP_SQRT_2, -constants::RECP_SQRT_2),
+    //                 ],
+    //             )
+    //             .unwrap(),
+    //         ),
+    //         GateDefn::RX { rot, .. } => {
+    //             let c = (rot / 2.0).cos();
+    //             let s = (rot / 2.0).sin();
+    //             Some(
+    //                 Array2::<Complex>::from_shape_vec(
+    //                     (2, 2),
+    //                     vec![
+    //                         Complex::new(c, 0.0),
+    //                         Complex::new(0.0, -s),
+    //                         Complex::new(0.0, -s),
+    //                         Complex::new(c, 0.0),
+    //                     ],
+    //                 )
+    //                 .unwrap(),
+    //             )
+    //         }
+    //         GateDefn::RY { rot, .. } => {
+    //             let c = (rot / 2.0).cos();
+    //             let s = (rot / 2.0).sin();
+    //             Some(
+    //                 Array2::<Complex>::from_shape_vec(
+    //                     (2, 2),
+    //                     vec![
+    //                         Complex::new(c, 0.0),
+    //                         Complex::new(-s, 0.0),
+    //                         Complex::new(s, 0.0),
+    //                         Complex::new(c, 0.0),
+    //                     ],
+    //                 )
+    //                 .unwrap(),
+    //             )
+    //         }
+    //         GateDefn::RZ { rot, .. } => Some(
+    //             Array2::<Complex>::from_shape_vec(
+    //                 (2, 2),
+    //                 vec![
+    //                     Complex::from_polar(1.0, -rot / 2.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::from_polar(1.0, rot / 2.0),
+    //                 ],
+    //             )
+    //             .unwrap(),
+    //         ),
+    //         GateDefn::SqrtX(_) => Some(
+    //             Array2::<Complex>::from_shape_vec(
+    //                 (2, 2),
+    //                 vec![
+    //                     Complex::new(1.0, 1.0),
+    //                     Complex::new(1.0, -1.0),
+    //                     Complex::new(1.0, -1.0),
+    //                     Complex::new(1.0, 1.0),
+    //                 ],
+    //             )
+    //             .unwrap()
+    //                 / 2.0,
+    //         ),
+    //         GateDefn::SqrtXdg(_) => Some(
+    //             Array2::<Complex>::from_shape_vec(
+    //                 (2, 2),
+    //                 vec![
+    //                     Complex::new(1.0, -1.0),
+    //                     Complex::new(1.0, 1.0),
+    //                     Complex::new(1.0, 1.0),
+    //                     Complex::new(1.0, -1.0),
+    //                 ],
+    //             )
+    //             .unwrap()
+    //                 / 2.0,
+    //         ),
+    //         GateDefn::U {
+    //             theta, phi, lambda, ..
+    //         } => {
+    //             let c = (theta / 2.0).cos();
+    //             let s = (theta / 2.0).sin();
+    //             let e_lam = Complex::from_polar(1.0, lambda);
+    //             let e_phi = Complex::from_polar(1.0, phi);
+    //             let e_phi_plus_lam = Complex::from_polar(1.0, phi + lambda);
+
+    //             Some(
+    //                 Array2::<Complex>::from_shape_vec(
+    //                     (2, 2),
+    //                     vec![
+    //                         Complex::new(c, 0.0),
+    //                         -s * e_lam,
+    //                         s * e_phi,
+    //                         c * e_phi_plus_lam,
+    //                     ],
+    //                 )
+    //                 .unwrap(),
+    //             )
+    //         }
+    //         GateDefn::Hadamard(_) => Some(
+    //             Array2::<Complex>::from_shape_vec(
+    //                 (2, 2),
+    //                 vec![
+    //                     Complex::new(constants::RECP_SQRT_2, 0.0),
+    //                     Complex::new(constants::RECP_SQRT_2, 0.0),
+    //                     Complex::new(constants::RECP_SQRT_2, 0.0),
+    //                     -Complex::new(constants::RECP_SQRT_2, 0.0),
+    //                 ],
+    //             )
+    //             .unwrap(),
+    //         ),
+    //         GateDefn::CX { .. } => Some(
+    //             Array2::<Complex>::from_shape_vec(
+    //                 (4, 4),
+    //                 vec![
+    //                     Complex::new(1.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(1.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(1.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(1.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                 ],
+    //             )
+    //             .unwrap(),
+    //         ),
+    //         GateDefn::CZ { .. } => Some(
+    //             Array2::<Complex>::from_shape_vec(
+    //                 (4, 4),
+    //                 vec![
+    //                     Complex::new(1.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(1.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(1.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(-1.0, 0.0),
+    //                 ],
+    //             )
+    //             .unwrap(),
+    //         ),
+    //         GateDefn::CPhase { rot, .. } => Some(
+    //             Array2::<Complex>::from_shape_vec(
+    //                 (4, 4),
+    //                 vec![
+    //                     Complex::new(1.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(1.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(1.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::from_polar(1.0, rot),
+    //                 ],
+    //             )
+    //             .unwrap(),
+    //         ),
+    //         GateDefn::Swap { .. } => Some(
+    //             Array2::<Complex>::from_shape_vec(
+    //                 (4, 4),
+    //                 vec![
+    //                     Complex::new(1.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(1.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(1.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(1.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                 ],
+    //             )
+    //             .unwrap(),
+    //         ),
+    //         GateDefn::FSim { theta, phi, .. } => {
+    //             let c = (theta / 2.0).cos();
+    //             let s = (theta / 2.0).sin();
+
+    //             Some(
+    //                 Array2::<Complex>::from_shape_vec(
+    //                     (4, 4),
+    //                     vec![
+    //                         Complex::new(1.0, 0.0),
+    //                         Complex::new(0.0, 0.0),
+    //                         Complex::new(0.0, 0.0),
+    //                         Complex::new(0.0, 0.0),
+    //                         Complex::new(0.0, 0.0),
+    //                         Complex::new(c, 0.0),
+    //                         Complex::new(0.0, -s),
+    //                         Complex::new(0.0, 0.0),
+    //                         Complex::new(0.0, 0.0),
+    //                         Complex::new(0.0, -s),
+    //                         Complex::new(c, 0.0),
+    //                         Complex::new(0.0, 0.0),
+    //                         Complex::new(0.0, 0.0),
+    //                         Complex::new(0.0, 0.0),
+    //                         Complex::new(0.0, 0.0),
+    //                         Complex::from_polar(1.0, -phi),
+    //                     ],
+    //                 )
+    //                 .unwrap(),
+    //             )
+    //         }
+    //         GateDefn::CCX { .. } => Some(
+    //             Array2::<Complex>::from_shape_vec(
+    //                 (8, 8),
+    //                 vec![
+    //                     Complex::new(1.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(1.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(1.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(1.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(1.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(1.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(1.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(0.0, 0.0),
+    //                     Complex::new(1.0, 0.0),
+    //                 ],
+    //             )
+    //             .unwrap(),
+    //         ),
+    //         GateDefn::CSwap { .. } => None,
+    //         _ => None,
+    //     }
+    // }
+
+    // pub fn affects_qubits(&self) -> usize {
+    //     match *self {
+    //         GateDefn::Hadamard(_)
+    //         | GateDefn::X(_)
+    //         | GateDefn::PauliY(_)
+    //         | GateDefn::PauliZ(_)
+    //         | GateDefn::Phase { .. }
+    //         | GateDefn::RX { .. }
+    //         | GateDefn::RY { .. }
+    //         | GateDefn::RZ { .. }
+    //         | GateDefn::S(_)
+    //         | GateDefn::Sdg(_)
+    //         | GateDefn::SqrtX(_)
+    //         | GateDefn::SqrtXdg(_)
+    //         | GateDefn::T(_)
+    //         | GateDefn::Tdg(_)
+    //         | GateDefn::U { .. } => 1,
+    //         GateDefn::CX { .. }
+    //         | GateDefn::CZ { .. }
+    //         | GateDefn::CPhase { .. }
+    //         | GateDefn::Swap { .. }
+    //         | GateDefn::FSim { .. } => 2,
+    //         GateDefn::CSwap { .. } | GateDefn::CCX { .. } => 3,
+    //         GateDefn::Other { .. } => 0,
+    //     }
+    // }
 }
 
 fn single_qubit_unitary_push<B: BasisIdx>(
@@ -819,5 +1250,84 @@ fn push_to_pull<B: BasisIdx>(defn: &GateDefn, touches: &[QubitIndex]) -> Option<
 impl<B: BasisIdx> PushApplicable<B> for Gate<B> {
     fn push_apply(&self, bidx: B, weight: Complex) -> PushApplyOutput<B> {
         self.defn.push_apply(bidx, weight)
+    }
+}
+
+impl GateDefn {
+    fn decompose_ccx(defn: &GateDefn) -> Vec<GateDefn> {
+        match defn {
+            GateDefn::CCX {
+                control1,
+                control2,
+                target,
+            } => vec![
+                GateDefn::Hadamard(*target),
+                // CNOT(control2 -> target)
+                GateDefn::CX {
+                    control: *control2,
+                    target: *target,
+                },
+                GateDefn::Tdg(*target),
+                // CNOT(control1 -> target)
+                GateDefn::CX {
+                    control: *control1,
+                    target: *target,
+                },
+                GateDefn::T(*target),
+                // CNOT(control2 -> target)
+                GateDefn::CX {
+                    control: *control2,
+                    target: *target,
+                },
+                GateDefn::Tdg(*target),
+                // CNOT(control1 -> target)
+                GateDefn::CX {
+                    control: *control1,
+                    target: *target,
+                },
+                GateDefn::T(*control2),
+                GateDefn::T(*target),
+                GateDefn::Hadamard(*target),
+            ],
+            _ => vec![],
+        }
+    }
+
+    pub fn decompose_cswap(gate: &GateDefn) -> Vec<GateDefn> {
+        match *gate {
+            GateDefn::CSwap {
+                control,
+                target1,
+                target2,
+            } => {
+                let mut decomp = vec![GateDefn::CX {
+                    control: target1,
+                    target: target2,
+                }];
+                decomp.append(
+                    &mut GateDefn::CCX {
+                        control1: control,
+                        control2: target2,
+                        target: target1,
+                    }
+                    .decompose_gate(),
+                );
+                decomp.push(GateDefn::CX {
+                    control: target1,
+                    target: target2,
+                });
+
+                decomp
+            }
+            _ => vec![],
+        }
+    }
+
+    pub fn decompose_gate(&self) -> Vec<GateDefn> {
+        match self {
+            GateDefn::CCX { .. } => GateDefn::decompose_ccx(self),
+            GateDefn::CSwap { .. } => GateDefn::decompose_cswap(self),
+            _ => vec![self.clone()],
+        }
     }
 }
