@@ -24,6 +24,9 @@
               futhark
               jemalloc
               rust-jemalloc-sys
+              pkg-config
+              openssl
+              openblas
             ];
             RUST_SRC_PATH = rustPlatform.rustLibSrc;
           };

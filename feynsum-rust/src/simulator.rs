@@ -3,6 +3,7 @@ use std::str::FromStr;
 
 pub mod dense_simulator;
 pub mod hybrid_simulator;
+pub mod mps_simulator;
 pub mod parallel_simulator;
 pub mod sequential_simulator;
 
@@ -18,6 +19,7 @@ pub enum Simulator {
     Parallel,
     Dense,
     Hybrid,
+    MPS,
 }
 
 impl FromStr for Simulator {
@@ -29,8 +31,9 @@ impl FromStr for Simulator {
             "parallel" | "par" => Ok(Simulator::Parallel),
             "dense" => Ok(Simulator::Dense),
             "hybrid" => Ok(Simulator::Hybrid),
+            "mps" => Ok(Simulator::MPS),
             _ => Err(format!(
-                "unknown simulator: {}; valid values are: sequential, parallel, and dense",
+                "unknown simulator: {}; valid values are: sequential, parallel, dense and mps",
                 s
             )),
         }
