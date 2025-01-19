@@ -279,7 +279,7 @@ fn expand_push_dense<B: BasisIdx, AB: AtomicBasisIdx<B>>(
                 apply_gates(&gates, &table, B::from_idx(idx), weight)
             })
             .sum(),
-        State::Never(_, _) => unreachable!(),
+        _ => unreachable!(),
     };
 
     let num_nonzeros = table.num_nonzeros();

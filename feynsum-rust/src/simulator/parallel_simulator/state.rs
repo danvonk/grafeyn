@@ -5,6 +5,7 @@ use std::sync::atomic::Ordering;
 
 use crate::types::{AtomicBasisIdx, BasisIdx, Complex};
 use crate::utility;
+
 mod dense_state_table;
 mod sparse_state_table;
 
@@ -28,7 +29,7 @@ impl<B: BasisIdx, AB: AtomicBasisIdx<B>> State<B, AB> {
         match self {
             State::Sparse(table) => table.num_nonzeros(),
             State::Dense(table) => table.num_nonzeros(),
-            State::Never(_, _) => unreachable!(),
+            _ => unreachable!(),
         }
     }
 
@@ -36,7 +37,7 @@ impl<B: BasisIdx, AB: AtomicBasisIdx<B>> State<B, AB> {
         match self {
             State::Sparse(table) => table.get(bidx),
             State::Dense(table) => table.get(bidx),
-            State::Never(_, _) => unreachable!(),
+            _ => unreachable!(),
         }
     }
 }
@@ -55,7 +56,7 @@ impl<B: BasisIdx, AB: AtomicBasisIdx<B>> Compactifiable<B> for State<B, AB> {
                     }
                 }))
             }
-            State::Never(_, _) => unreachable!(),
+            _ => unreachable!(),
         }
     }
 }
