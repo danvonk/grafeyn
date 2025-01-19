@@ -58,7 +58,9 @@ fn main() -> io::Result<()> {
     };
     log::info!("parse complete. starting circuit construction.");
 
-    if circuit::num_qubits(&program) <= BASIS_IDX_64_OKAY_THRESHOLD {
+    // TODO: re-enable BasisIdxUnlimited
+    // if circuit::num_qubits(&program) <= BASIS_IDX_64_OKAY_THRESHOLD {
+    if true {
         build_circuit_and_run::<BasisIdx64, AtomicU64>(options, config, program)
     } else {
         build_circuit_and_run::<BasisIdxUnlimited, RwLock<BasisIdxUnlimited>>(
@@ -118,6 +120,10 @@ fn run<B: BasisIdx, AB: AtomicBasisIdx<B>>(
         Simulator::Hybrid => {
             log::info!("using hybrid simulator");
             simulator::hybrid_simulator::run::<B, AB>(&config, circuit)
+        }
+        Simulator::MPS => {
+            log::info!("using MPS simulator");
+            simulator::mps_simulator::run::<B>(&config, circuit).compactify()
         }
     }
 }
