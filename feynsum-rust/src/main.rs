@@ -43,8 +43,12 @@ fn main() -> io::Result<()> {
     log::info!("gate scheduling policy: {}", options.gate_schduling_policy);
     log::info!("dense threshold: {}", options.dense_threshold);
     log::info!("pull threshold: {}", options.pull_threshold);
-    log::info!("parallelism: {}", options.parallelism);
+    log::info!("parallelism: {} threads", options.parallelism);
     log::info!("block size: {}", options.block_size);
+    log::info!(
+        "bond dimension threshold: {}",
+        options.bond_dimension_threshold
+    );
 
     let source = fs::read_to_string(&options.input)?;
 
@@ -58,9 +62,7 @@ fn main() -> io::Result<()> {
     };
     log::info!("parse complete. starting circuit construction.");
 
-    // TODO: re-enable BasisIdxUnlimited
-    // if circuit::num_qubits(&program) <= BASIS_IDX_64_OKAY_THRESHOLD {
-    if true {
+    if circuit::num_qubits(&program) <= BASIS_IDX_64_OKAY_THRESHOLD {
         build_circuit_and_run::<BasisIdx64, AtomicU64>(options, config, program)
     } else {
         build_circuit_and_run::<BasisIdxUnlimited, RwLock<BasisIdxUnlimited>>(
