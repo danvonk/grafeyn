@@ -28,6 +28,16 @@ pub fn expand<B: BasisIdx>(
                 | crate::circuit::GateDefn::X(qindex) => mps.apply_single_qubit_gate(&mat, qindex),
                 _ => (),
             },
+            2 => match g.defn {
+                crate::circuit::GateDefn::CX { control, target } => {
+                    if control + 1 == target {
+                        mps.apply_two_qubit_gate(&mat, control, target)
+                    } else {
+                        mps.apply_two_qubit_gate_nonadjacent(&mat, control, target);
+                    }
+                }
+                _ => (),
+            },
             _ => (),
         }
         gate_apps += 1;

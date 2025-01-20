@@ -1256,3 +1256,14 @@ impl<B: BasisIdx> PushApplicable<B> for Gate<B> {
         self.defn.push_apply(bidx, weight)
     }
 }
+
+pub fn decompose_cswap(defn: &GateDefn) -> Option<Vec<GateDefn>> {
+    match *defn {
+        GateDefn::CSwap {
+            control,
+            target1,
+            target2,
+        } => None,
+        _ => None,
+    }
+}
