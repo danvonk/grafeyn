@@ -1,5 +1,5 @@
 use super::state::State;
-use crate::circuit::Gate;
+use crate::circuit::{Gate, GateDefn};
 use crate::config::Config;
 use crate::types::BasisIdx;
 
@@ -21,25 +21,7 @@ pub fn expand<B: BasisIdx>(
     let mut gate_apps = 0;
 
     for g in gates {
-        let mat = g.defn.gate_to_matrix().unwrap();
-        match g.defn.affects_qubits() {
-            1 => match g.defn {
-                crate::circuit::GateDefn::Hadamard(qindex)
-                | crate::circuit::GateDefn::X(qindex) => mps.apply_single_qubit_gate(&mat, qindex),
-                _ => (),
-            },
-            2 => match g.defn {
-                crate::circuit::GateDefn::CX { control, target } => {
-                    if control + 1 == target {
-                        mps.apply_two_qubit_gate(&mat, control, target)
-                    } else {
-                        mps.apply_two_qubit_gate_nonadjacent(&mat, control, target);
-                    }
-                }
-                _ => (),
-            },
-            _ => (),
-        }
+        mps.apply_gate(g);
         gate_apps += 1;
     }
 

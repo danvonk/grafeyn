@@ -2,7 +2,7 @@ use ndarray::*;
 use ndarray_linalg::*;
 
 use crate::{
-    circuit::GateDefn,
+    circuit::{Gate, GateDefn},
     types::{BasisIdx, Complex},
 };
 
@@ -112,7 +112,7 @@ impl MPSState {
         self.nonzeros::<B>().iter().count()
     }
 
-    pub fn apply_single_qubit_gate(&mut self, matrix: &Array2<Complex>, site: usize) {
+    fn apply_single_qubit_gate(&mut self, matrix: &Array2<Complex>, site: usize) {
         println!("Apply gate to site {}", site);
         let a = &mut self.tensors[site];
         let (bond_in, _, bond_out) = a.dim();
@@ -136,7 +136,9 @@ impl MPSState {
         }
     }
 
-    pub fn apply_two_qubit_gate(&mut self, matrix: &Array2<Complex>, site1: usize, site2: usize) {
+    fn apply_two_qubit_gate(&mut self, matrix: &Array2<Complex>, site1: usize, site2: usize) {
+        println!("Applying two-qubit gate to sites {} and {}", site1, site2);
+
         // 1. Sort site1, site2 so that site1 < site2
         let (left_site, right_site) = if site1 < site2 {
             (site1, site2)
@@ -215,7 +217,6 @@ impl MPSState {
         //     SVDInto consumes the data and returns newly allocated U, S, V^H.
         //
 
-        // let svd_res = reshaped_for_svd.svd_into(true, true).unwrap();
         let (u_opt, s, vt_opt) = reshaped_for_svd.svd_into(true, true).unwrap();
 
         let u = u_opt.expect("U was requested"); // shape (dL2*2, rank)
@@ -269,7 +270,7 @@ impl MPSState {
         self._bond_dims[right_site] = (chi, dR2); // new bond_in= chi, bond_out= dR2
     }
 
-    pub fn apply_two_qubit_gate_nonadjacent(
+    fn apply_two_qubit_gate_nonadjacent(
         &mut self,
         matrix: &Array2<Complex>,
         site1: usize,
@@ -318,5 +319,69 @@ impl MPSState {
             );
             q_high += 1;
         }
+    }
+
+    pub fn apply_gate<B: BasisIdx>(&mut self, gate: &Gate<B>) {
+        let mat = gate.defn.gate_to_matrix().unwrap();
+        match gate.defn {
+            GateDefn::Hadamard(qindex)
+            | GateDefn::S(qindex)
+            | GateDefn::Sdg(qindex)
+            | GateDefn::SqrtX(qindex)
+            | GateDefn::SqrtXdg(qindex)
+            | GateDefn::Tdg(qindex)
+            | GateDefn::T(qindex)
+            | GateDefn::X(qindex)
+            | GateDefn::PauliY(qindex)
+            | GateDefn::PauliZ(qindex)
+            | GateDefn::Phase { target: qindex, .. }
+            | GateDefn::RX { target: qindex, .. }
+            | GateDefn::RY { target: qindex, .. }
+            | GateDefn::RZ { target: qindex, .. }
+            | GateDefn::CX { target: qindex, .. }
+            | GateDefn::CZ { target: qindex, .. }
+            | GateDefn::U { target: qindex, .. } => self.apply_single_qubit_gate(&mat, qindex),
+            GateDefn::CPhase {
+                control, target, ..
+            } => {
+                let (left_site, right_site) = if control < target {
+                    (control, target)
+                } else {
+                    (target, control)
+                };
+                if left_site + 1 == right_site {
+                    self.apply_two_qubit_gate(&mat, left_site, right_site);
+                } else {
+                    self.apply_two_qubit_gate_nonadjacent(&mat, left_site, right_site);
+                }
+            }
+            GateDefn::Swap { target1, target2 } => {
+                let (left_site, right_site) = if target1 < target2 {
+                    (target1, target2)
+                } else {
+                    (target2, target1)
+                };
+                if left_site + 1 == right_site {
+                    self.apply_two_qubit_gate(&mat, left_site, right_site);
+                } else {
+                    self.apply_two_qubit_gate_nonadjacent(&mat, left_site, right_site);
+                }
+            }
+            GateDefn::FSim {
+                left: left_site,
+                right: right_site,
+                ..
+            } => {
+                if left_site + 1 == right_site {
+                    self.apply_two_qubit_gate(&mat, left_site, right_site);
+                } else {
+                    self.apply_two_qubit_gate_nonadjacent(&mat, left_site, right_site);
+                }
+            }
+            // We don't handle >= 3 qubit gates, they must have been decomposed already
+            GateDefn::CSwap { .. } | GateDefn::CCX { .. } | GateDefn::Other { .. } => {
+                println!("Skipping gate {:?}!", gate.defn);
+            }
+        };
     }
 }
