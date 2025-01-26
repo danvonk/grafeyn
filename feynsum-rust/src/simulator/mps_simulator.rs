@@ -42,7 +42,7 @@ pub fn run<B: BasisIdx>(config: &Config, circuit: Circuit<B>) -> State {
                 state: new_state,
                 num_gate_apps: num_gate_apps_here,
             },
-        ) = profile!(expand::<B>(these_gates, config, num_qubits, state));
+        ) = profile!(expand::<B>(these_gates, config, state));
 
         //let density = {
         //    let max_num_states: u64 = 1 << num_qubits;

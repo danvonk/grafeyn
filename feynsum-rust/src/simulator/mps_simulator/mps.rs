@@ -114,7 +114,6 @@ impl MPSState {
             assert_eq!(bond_vec.len(), 1);
             nonzeros.push((bits, bond_vec[0]));
         }
-
         nonzeros
     }
 
@@ -143,8 +142,6 @@ impl MPSState {
         site1: usize,
         site2: usize,
     ) {
-        println!("Applying two-qubit gate to sites {} and {}", site1, site2);
-
         // Ensure site1 < site2 for simplicity (non-symmetric gates must be switched for their equivalent)
         let (left_site, right_site) = if site1 < site2 {
             (site1, site2)
@@ -444,7 +441,10 @@ impl MPSState {
             }
             // We don't handle >= 3 qubit gates, they must have been decomposed already
             GateDefn::CSwap { .. } | GateDefn::CCX { .. } | GateDefn::Other { .. } => {
-                println!("Skipping gate {:?}!", gate.defn);
+                log::warn!(
+                    "Skipping gate {:?} as 3-qubit gates are not implemented by the MPS simulator.",
+                    gate.defn
+                );
             }
         };
     }
