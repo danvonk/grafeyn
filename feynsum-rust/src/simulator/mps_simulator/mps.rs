@@ -42,6 +42,7 @@ impl MPSState {
         }
     }
 
+    /// Returns the basis indices which have non-zero amplitude from the MPS state.
     pub fn nonzeros<B: BasisIdx>(&self) -> Vec<(B, Complex)> {
         let n = self.n_sites;
         if n == 0 {
@@ -54,8 +55,7 @@ impl MPSState {
 
         // Start from site 0
         {
-            let (tensor_0, tensor_1) = &self.tensors[0]; // Matrices for |0⟩ and |1⟩
-                                                         // let d_out = tensor_0.ncols(); // Right bond dimension
+            let (tensor_0, tensor_1) = &self.tensors[0];
 
             // Process |0⟩
             let bond_vec_0 = tensor_0.row(0).transpose(); // Extract bond vector for |0⟩
@@ -168,10 +168,9 @@ impl MPSState {
             bond_left, bond_middle, bond_right
         );
 
+        // Build the joint tensor for the two-qubit site so we can apply gate
         let mut combined = DMatrix::from_fn(bond_left * bond_right, 4, |row, col| {
-            // row in [0, .. bondL * bondR)
-            // col in [0, .. 4)
-            // Decompose row into (alphaL, alphaR) pair
+            // Decompose row into (alpha_left, alpha_right) pair
             let alpha_l = row / bond_right; // in [0..bond_left)
             let alpha_r = row % bond_right; // in [0..bond_right)
 
@@ -179,11 +178,9 @@ impl MPSState {
             let i = col / 2; // in [0..2)
             let j = col % 2; // in [0..2)
 
-            // Sum over alphaM (the middle bond), to contract the MPS
             let mut val = Complex::new(0.0, 0.0);
             for alpha_middle in 0..bond_middle {
-                // Choose correct site1/site2 blocks depending on (i,j)
-                // i => {tensor1_0, tensor1_1}, j => {tensor2_0, tensor2_1}
+                // i in {tensor1_0, tensor1_1}, j in {tensor2_0, tensor2_1}
                 match (i, j) {
                     (0, 0) => {
                         val +=
@@ -213,11 +210,11 @@ impl MPSState {
             gate.mat.shape(),
         );
 
+        // Apply gate
         combined = combined * gate.mat.clone();
 
-        // We'll create `expanded` with shape (dL*2, 2*dR).
-        // row => alphaL*2 + i
-        // col => alphaR*2 + j
+        // Turn (bond_left * bond_right, 4) matrix back into (bond_left * 2, bond_right * 2) otherwise we will
+        // permanently fuse the site by the SVD
         let mut expanded =
             DMatrix::from_element(bond_left * 2, 2 * bond_right, Complex::new(0.0, 0.0));
 
@@ -228,12 +225,11 @@ impl MPSState {
                 let alpha_right = new_col / 2;
                 let j = new_col % 2;
 
-                // get from row = alpha_left*dR + alpha_right, col = i*2 + j
+                // get from row := alpha_left*dR + alpha_right, col := i*2 + j
                 let row = alpha_left * bond_right + alpha_right; // 0..(dL*dR)
                 let col = i * 2 + j; // 0..4
 
-                let val = combined[(row, col)];
-                expanded[(new_row, new_col)] = val;
+                expanded[(new_row, new_col)] = combined[(row, col)];
             }
         }
 
@@ -269,15 +265,17 @@ impl MPSState {
             vt_scaled.shape()
         );
 
-        // Left site: (tensor0_left, tensor1_left), each have shape (dL, chi)
+        // We now need to turn U, V^T back into slices for |0> and |1> for left and right site
+
+        // Left site: (tensor0_left, tensor1_left), each have shape (bond_left, chi)
         let mut left_0 = DMatrix::zeros(bond_left, chi);
         let mut left_1 = DMatrix::zeros(bond_left, chi);
 
-        // Right site: (tensor0_right, tensor1_right), each have shape (chi, bondRight)
+        // Right site: (tensor0_right, tensor1_right), each have shape (chi, bond_right)
         let mut right_0 = DMatrix::zeros(chi, bond_right);
         let mut right_1 = DMatrix::zeros(chi, bond_right);
 
-        // U has shape (dL*2, chi), we do the row => alphaL, i split:
+        // U has shape (bond_left *2, chi). Split row into alpha_left, i:
         for row in 0..(2 * bond_left) {
             let alpha_left = row / 2;
             let i = row % 2;
@@ -291,7 +289,7 @@ impl MPSState {
             }
         }
 
-        // V^T has shape (chi, 2 * bond_right), do:
+        // V^T has shape (chi, 2 * bond_right). Split into alpha_right, j:
         for row in 0..chi {
             for col in 0..(2 * bond_right) {
                 let alpha_right = col / 2;
@@ -309,7 +307,6 @@ impl MPSState {
         self.tensors[left_site] = (left_0, left_1);
         self.tensors[right_site] = (right_0, right_1);
 
-        // Update bond dims
         self.bond_dims[left_site] = (bond_left, chi);
         self.bond_dims[right_site] = (chi, bond_right);
     }
@@ -321,7 +318,7 @@ impl MPSState {
         site1: usize,
         site2: usize,
     ) {
-        // 1. Sort so we only handle q_low < q_high
+        // Sort so we only need to handle q_low < q_high
         let (q_low, mut q_high) = if site1 < site2 {
             (site1, site2)
         } else {
@@ -329,8 +326,7 @@ impl MPSState {
         };
         let orig_q_high = q_high;
 
-        // 2. Move q_high left until it is directly next to q_low
-        //    i.e. while q_high > q_low + 1, swap adjacent (q_high - 1, q_high)
+        // Move q_high left (by swapping adjacents) until it is directly next to q_low
         while q_high > q_low + 1 {
             self.apply_two_qubit_gate(
                 config,
@@ -345,12 +341,10 @@ impl MPSState {
             q_high -= 1;
         }
 
-        // Now q_high == q_low + 1 => adjacent
-
-        // 3. Apply the actual two-qubit gate
+        // Now q_high == q_low + 1, so apply adjacent application
         self.apply_two_qubit_gate(config, matrix, q_low, q_high);
 
-        // 4. Move q_high back to its original position using SWAPs to the right
+        // Move q_high back to its original position using SWAPs to the right
         while q_high < orig_q_high {
             self.apply_two_qubit_gate(
                 config,

@@ -310,6 +310,7 @@ impl<B: BasisIdx> Unitary for Gate<B> {
     fn unitary_rev(&self) -> UnitaryMatrix {
         match &self.defn {
             GateDefn::CX { control, target } => {
+                // The standard "textbook" CX where first qubit is control
                 let mat = dmatrix![
                     Complex::new(1.0, 0.0), Complex::new(0.0, 0.0), Complex::new(0.0, 0.0), Complex::new(0.0, 0.0);
                     Complex::new(0.0, 0.0), Complex::new(1.0, 0.0), Complex::new(0.0, 0.0), Complex::new(0.0, 0.0);
