@@ -159,11 +159,6 @@ impl MPSState {
         let (bond_left, bond_middle) = self.bond_dims[left_site];
         let (_, bond_right) = self.bond_dims[right_site];
 
-        println!(
-            "Bond left: {}, Bond middle: {}, Bond right: {}",
-            bond_left, bond_middle, bond_right
-        );
-
         // Build the joint tensor for the two-qubit site so we can apply gate
         let mut combined = DMatrix::from_fn(bond_left * bond_right, 4, |row, col| {
             // Decompose row into (alpha_left, alpha_right) pair
@@ -200,12 +195,6 @@ impl MPSState {
             val
         });
 
-        println!(
-            "shapes: doing combined * gate = {:?} * {:?}",
-            combined.shape(),
-            gate.mat.shape(),
-        );
-
         // Apply gate
         combined = combined * gate.mat.clone();
 
@@ -229,13 +218,6 @@ impl MPSState {
             }
         }
 
-        println!(
-            "Expanded has shape {:?}, whilst (dL * 2, 2 * dR) = ({},{})",
-            expanded.shape(),
-            2 * bond_left,
-            2 * bond_right
-        );
-
         // Perform SVD on updated tensor
         let svd = expanded.svd(true, true);
         let u = svd.u.unwrap();
@@ -254,12 +236,6 @@ impl MPSState {
             u_scaled.column_mut(i).scale_mut(sqrt_sigma);
             vt_scaled.row_mut(i).scale_mut(sqrt_sigma);
         }
-
-        println!(
-            "Shape of U: {:?}, V^T: {:?} (Want (dL*2, Chi) and (Chi, dR*2))",
-            u_scaled.shape(),
-            vt_scaled.shape()
-        );
 
         // We now need to turn U, V^T back into slices for |0> and |1> for left and right site
 
