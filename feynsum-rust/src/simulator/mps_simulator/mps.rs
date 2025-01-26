@@ -10,7 +10,6 @@ use crate::{
 // TODO: we should be able to switch to/from this and the other representations
 #[derive(Debug)]
 pub struct MPSState {
-    // MPS tensors, each represented as a collection of matrices (2 slices per site)
     // One component in the pair for Left |0> and Right |1> respectively.
     pub tensors: Vec<(DMatrix<Complex>, DMatrix<Complex>)>,
     // Bond dimensions between sites: (dL, dR)
@@ -22,18 +21,18 @@ pub struct MPSState {
 impl MPSState {
     /// Create a new MPS (0,...,0) state
     pub fn singleton(num_qubits: usize) -> Self {
-        let mut tensors = Vec::new();
-        let mut bond_dims = Vec::new();
+        let (tensors, bond_dims): (
+            Vec<(DMatrix<Complex>, DMatrix<Complex>)>,
+            Vec<(usize, usize)>,
+        ) = (0..num_qubits)
+            .map(|_| {
+                // For each qubit, create the |0> and |1> matrices. Initialise the left/right bond dimensions as (1,1)
+                let tensor_0 = DMatrix::from_element(1, 1, Complex::new(1.0, 0.0)); // |0>
+                let tensor_1 = DMatrix::from_element(1, 1, Complex::new(0.0, 0.0)); // |1>
 
-        for _ in 0..num_qubits {
-            // Initialize |0> tensor
-            let tensor_0 = DMatrix::from_element(1, 1, Complex::new(1.0, 0.0)); // |0>
-                                                                                // no contribution from |1> state
-            let tensor_1 = DMatrix::from_element(1, 1, Complex::new(0.0, 0.0)); // |1>
-
-            tensors.push((tensor_0, tensor_1));
-            bond_dims.push((1, 1)); // Initial bond dimensions are 1
-        }
+                ((tensor_0, tensor_1), (1, 1))
+            })
+            .unzip();
 
         Self {
             tensors,
@@ -53,18 +52,16 @@ impl MPSState {
         // Maintain a list of partial expansions: (bitstring_so_far, bond_vector)
         let mut partials: Vec<(B, DVector<Complex>)> = Vec::new();
 
-        // Start from site 0
+        // Starting from the left-most state, we add the partial contributions to the vec
         {
             let (tensor_0, tensor_1) = &self.tensors[0];
 
-            // Process |0⟩
-            let bond_vec_0 = tensor_0.row(0).transpose(); // Extract bond vector for |0⟩
+            let bond_vec_0 = tensor_0.row(0).transpose(); // Extract bond vector for |0>
             if !bond_vec_0.iter().all(|&c| is_zero(c)) {
                 partials.push((B::from_idx(0), bond_vec_0));
             }
 
-            // Process |1⟩
-            let bond_vec_1 = tensor_1.row(0).transpose(); // Extract bond vector for |1⟩
+            let bond_vec_1 = tensor_1.row(0).transpose(); // Extract bond vector for |1>
             if !bond_vec_1.iter().all(|&c| is_zero(c)) {
                 partials.push((B::from_idx(1), bond_vec_1));
             }
@@ -73,48 +70,47 @@ impl MPSState {
         // Iterate through the rest of the sites
         for site in 1..n {
             let mut next_partials: Vec<(B, DVector<Complex>)> = Vec::new();
-            let (tensor_0, tensor_1) = &self.tensors[site]; // Matrices for |0⟩ and |1⟩
-            let d_in = tensor_0.nrows(); // Left bond dimension
-            let d_out = tensor_0.ncols(); // Right bond dimension
+            let (tensor_0, tensor_1) = &self.tensors[site];
+            let (d_in, d_out) = self.bond_dims[site];
 
             // Process each partial expansion from the previous site
             for (bits, bond_vec) in partials {
-                // Process |0⟩
+                // Process |0>
                 let mut new_bond_vec_0 = DVector::zeros(d_out);
                 for alpha_in in 0..d_in {
                     for alpha_out in 0..d_out {
+                        // Add contribution from this site
                         new_bond_vec_0[alpha_out] +=
                             bond_vec[alpha_in] * tensor_0[(alpha_in, alpha_out)];
                     }
                 }
                 if !new_bond_vec_0.iter().all(|&c| is_zero(c)) {
-                    next_partials.push((bits.clone(), new_bond_vec_0)); // No change to bits for |0⟩
+                    next_partials.push((bits.clone(), new_bond_vec_0)); // No change to bits for |0>
                 }
 
-                // Process |1⟩
+                // Process |1>
                 let mut new_bond_vec_1 = DVector::zeros(d_out);
                 for alpha_in in 0..d_in {
                     for alpha_out in 0..d_out {
+                        // Add contribution from this site
                         new_bond_vec_1[alpha_out] +=
                             bond_vec[alpha_in] * tensor_1[(alpha_in, alpha_out)];
                     }
                 }
+
                 if !new_bond_vec_1.iter().all(|&c| is_zero(c)) {
-                    next_partials.push((bits.set(site), new_bond_vec_1)); // Set the bit for |1⟩
+                    next_partials.push((bits.set(site), new_bond_vec_1)); // Set the bit for |1>
                 }
             }
 
             partials = next_partials;
         }
 
-        // Extract the final non-zero states and their amplitudes
-        let mut nonzeros = Vec::new();
-        for (bits, bond_vec) in partials {
-            // The final bond vector should have size 1 (d_out = 1 at the last site)
-            assert_eq!(bond_vec.len(), 1);
-            nonzeros.push((bits, bond_vec[0]));
-        }
-        nonzeros
+        // Extract the final non-zero states and their amplitudes and return
+        partials
+            .iter()
+            .map(|(bits, bond_vec)| (bits.clone(), bond_vec[0]))
+            .collect::<Vec<(B, Complex)>>()
     }
 
     pub fn num_nonzeros<B: BasisIdx>(&self) -> usize {
