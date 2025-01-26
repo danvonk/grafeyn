@@ -390,20 +390,16 @@ impl MPSState {
             | GateDefn::CPhase {
                 control, target, ..
             } => {
-                let (left_site, right_site) = if control < target {
-                    (control, target)
+                let (left_site, right_site, mat) = if control < target {
+                    (control, target, gate.unitary_rev())
                 } else {
-                    (target, control)
+                    (target, control, gate.unitary())
                 };
+
                 if left_site + 1 == right_site {
-                    self.apply_two_qubit_gate(config, &gate.unitary(), left_site, right_site);
+                    self.apply_two_qubit_gate(config, &mat, left_site, right_site);
                 } else {
-                    self.apply_two_qubit_gate_nonadjacent::<B>(
-                        config,
-                        &gate.unitary(),
-                        left_site,
-                        right_site,
-                    );
+                    self.apply_two_qubit_gate_nonadjacent::<B>(config, &mat, left_site, right_site);
                 }
             }
             GateDefn::Swap { target1, target2 } => {
