@@ -122,11 +122,12 @@ impl MPSState {
         self.nonzeros::<B>().iter().count()
     }
 
+    /// Apply the unitary matrix of a gate to a chosen site
     fn apply_single_qubit_gate(&mut self, gate: &UnitaryMatrix, site: usize) {
         let (tensor_0, tensor_1) = &mut self.tensors[site];
         let mat = &gate.mat;
 
-        // Apply the gate to the |0> and |1> components
+        // Apply the gate to the |0> and |1> components of the site
         let new_tensor_0 = tensor_0.clone() * mat[(0, 0)] + tensor_1.clone() * mat[(0, 1)];
         let new_tensor_1 = tensor_0.clone() * mat[(1, 0)] + tensor_1.clone() * mat[(1, 1)];
 
@@ -134,6 +135,7 @@ impl MPSState {
         *tensor_1 = new_tensor_1;
     }
 
+    /// Apply the unitary matrix of a two-qubit gate to the chosen sites. They must be adjacent.
     fn apply_two_qubit_gate(
         &mut self,
         config: &Config,
@@ -143,7 +145,7 @@ impl MPSState {
     ) {
         println!("Applying two-qubit gate to sites {} and {}", site1, site2);
 
-        // Ensure site1 < site2 for simplicity
+        // Ensure site1 < site2 for simplicity (non-symmetric gates must be switched for their equivalent)
         let (left_site, right_site) = if site1 < site2 {
             (site1, site2)
         } else {
@@ -173,8 +175,8 @@ impl MPSState {
             // row in [0, .. bondL * bondR)
             // col in [0, .. 4)
             // Decompose row into (alphaL, alphaR) pair
-            let alphaL = row / bond_right; // in [0..bond_left)
-            let alphaR = row % bond_right; // in [0..bond_right)
+            let alpha_l = row / bond_right; // in [0..bond_left)
+            let alpha_r = row % bond_right; // in [0..bond_right)
 
             // Decompose col into (i, j)
             let i = col / 2; // in [0..2)
@@ -182,24 +184,25 @@ impl MPSState {
 
             // Sum over alphaM (the middle bond), to contract the MPS
             let mut val = Complex::new(0.0, 0.0);
-            for alphaM_local in 0..bond_middle {
+            for alpha_middle in 0..bond_middle {
                 // Choose correct site1/site2 blocks depending on (i,j)
                 // i => {tensor1_0, tensor1_1}, j => {tensor2_0, tensor2_1}
                 match (i, j) {
                     (0, 0) => {
-                        val += tensor1_0[(alphaL, alphaM_local)] * tensor2_0[(alphaM_local, alphaR)]
+                        val +=
+                            tensor1_0[(alpha_l, alpha_middle)] * tensor2_0[(alpha_middle, alpha_r)]
                     }
                     (0, 1) => {
                         val +=
-                            tensor1_0[(alphaL, alphaM_local)] * tensor2_1[(alphaM_local, alphaR)];
+                            tensor1_0[(alpha_l, alpha_middle)] * tensor2_1[(alpha_middle, alpha_r)];
                     }
                     (1, 0) => {
                         val +=
-                            tensor1_1[(alphaL, alphaM_local)] * tensor2_0[(alphaM_local, alphaR)];
+                            tensor1_1[(alpha_l, alpha_middle)] * tensor2_0[(alpha_middle, alpha_r)];
                     }
                     (1, 1) => {
                         val +=
-                            tensor1_1[(alphaL, alphaM_local)] * tensor2_1[(alphaM_local, alphaR)];
+                            tensor1_1[(alpha_l, alpha_middle)] * tensor2_1[(alpha_middle, alpha_r)];
                     }
                     _ => unreachable!(),
                 }
@@ -222,15 +225,14 @@ impl MPSState {
             DMatrix::from_element(bond_left * 2, 2 * bond_right, Complex::new(0.0, 0.0));
 
         for new_row in 0..(bond_left * 2) {
-            let alphaL = new_row / 2; // 0..(bond_left-1)
+            let alpha_left = new_row / 2; // 0..(bond_left-1)
             let i = new_row % 2; // i in {0,1}
             for new_col in 0..(2 * bond_right) {
-                let alphaR = new_col / 2;
+                let alpha_right = new_col / 2;
                 let j = new_col % 2;
 
-                // We'll retrieve from `updated[row, col]`
-                // where row = alphaL*dR + alphaR, col = i*2 + j
-                let row = alphaL * bond_right + alphaR; // 0..(dL*dR)
+                // get from row = alpha_left*dR + alpha_right, col = i*2 + j
+                let row = alpha_left * bond_right + alpha_right; // 0..(dL*dR)
                 let col = i * 2 + j; // 0..4
 
                 let val = combined[(row, col)];
@@ -248,18 +250,18 @@ impl MPSState {
         // Perform SVD on updated tensor
         let svd = expanded.svd(true, true);
         let u = svd.u.unwrap();
-        let s_vals = svd.singular_values;
+        let sigma = svd.singular_values;
         let vt = svd.v_t.unwrap();
 
         // Truncate if needed
-        let chi = s_vals.len().min(config.bond_dimension_threshold);
+        let chi = sigma.len().min(config.bond_dimension_threshold);
 
-        // Scale symmetrically
+        // Scale symmetrically by the singular values
         let mut u_scaled = u.columns(0, chi).into_owned();
         let mut vt_scaled = vt.rows(0, chi).into_owned();
 
         for i in 0..chi {
-            let sqrt_sigma = s_vals[i].sqrt();
+            let sqrt_sigma = sigma[i].sqrt();
             u_scaled.column_mut(i).scale_mut(sqrt_sigma);
             vt_scaled.row_mut(i).scale_mut(sqrt_sigma);
         }
@@ -270,24 +272,24 @@ impl MPSState {
             vt_scaled.shape()
         );
 
-        // Left site: (tensor0_left, tensor1_left), each shape (dL, chi)
+        // Left site: (tensor0_left, tensor1_left), each have shape (dL, chi)
         let mut left_0 = DMatrix::zeros(bond_left, chi);
         let mut left_1 = DMatrix::zeros(bond_left, chi);
 
-        // Right site: (tensor0_right, tensor1_right), each shape (chi, bondRight)
+        // Right site: (tensor0_right, tensor1_right), each have shape (chi, bondRight)
         let mut right_0 = DMatrix::zeros(chi, bond_right);
         let mut right_1 = DMatrix::zeros(chi, bond_right);
 
         // U has shape (dL*2, chi), we do the row => alphaL, i split:
         for row in 0..(2 * bond_left) {
-            let alphaL = row / 2;
+            let alpha_left = row / 2;
             let i = row % 2;
-            for alphaM in 0..chi {
-                let val = u_scaled[(row, alphaM)];
+            for alpha_middle in 0..chi {
+                let val = u_scaled[(row, alpha_middle)];
                 if i == 0 {
-                    left_0[(alphaL, alphaM)] = val;
+                    left_0[(alpha_left, alpha_middle)] = val;
                 } else {
-                    left_1[(alphaL, alphaM)] = val;
+                    left_1[(alpha_left, alpha_middle)] = val;
                 }
             }
         }
@@ -295,13 +297,13 @@ impl MPSState {
         // V^T has shape (chi, 2 * bond_right), do:
         for row in 0..chi {
             for col in 0..(2 * bond_right) {
-                let alphaR = col / 2;
+                let alpha_right = col / 2;
                 let j = col % 2;
                 let val = vt_scaled[(row, col)];
                 if j == 0 {
-                    right_0[(row, alphaR)] = val;
+                    right_0[(row, alpha_right)] = val;
                 } else {
-                    right_1[(row, alphaR)] = val;
+                    right_1[(row, alpha_right)] = val;
                 }
             }
         }
@@ -313,8 +315,6 @@ impl MPSState {
         // Update bond dims
         self.bond_dims[left_site] = (bond_left, chi);
         self.bond_dims[right_site] = (chi, bond_right);
-
-        println!("Done.");
     }
 
     fn apply_two_qubit_gate_nonadjacent<B: BasisIdx>(
