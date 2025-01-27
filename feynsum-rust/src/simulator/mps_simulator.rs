@@ -1,4 +1,6 @@
+mod dense_table;
 mod mps;
+mod sparse_table;
 mod state;
 mod state_expander;
 
@@ -11,9 +13,11 @@ use crate::types::{BasisIdx, Real};
 pub use state::State;
 pub use state_expander::{expand, ExpandResult};
 
-pub fn run<B: BasisIdx>(config: &Config, circuit: Circuit<B>) -> State {
+pub fn run<B: BasisIdx>(config: &Config, circuit: Circuit<B>) -> State<B> {
     let num_gates = circuit.num_gates();
     let num_qubits = circuit.num_qubits;
+    let mut num_nonzeros = 1;
+    let mut prev_num_nonzeros = 1;
 
     let mut num_gates_visited = 0;
     let mut state = State::MPS(mps::MPSState::singleton(num_qubits));
@@ -40,40 +44,54 @@ pub fn run<B: BasisIdx>(config: &Config, circuit: Circuit<B>) -> State {
             duration,
             ExpandResult {
                 state: new_state,
+                num_nonzeros: new_num_nonzeros,
                 num_gate_apps: num_gate_apps_here,
+                method,
+                ..
             },
-        ) = profile!(expand::<B>(these_gates, config, state));
+        ) = profile!(expand::<B>(
+            these_gates,
+            config,
+            num_qubits,
+            prev_num_nonzeros,
+            state
+        ));
 
-        //let density = {
-        //    let max_num_states: u64 = 1 << num_qubits;
-        //    num_nonzeros as Real / max_num_states as Real
-        //};
+        let density = {
+            let max_num_states: u64 = 1 << num_qubits;
+            num_nonzeros as Real / max_num_states as Real
+        };
 
         let throughput = (num_gate_apps_here as Real / 1e6) / duration.as_secs_f32();
 
         println!(
-            "gate: {:<3} hop: {:<2} time: {:.4}s throughput: {:.2}M gates/s",
+            "gate: {:<3} density: {:.8} nonzero: {:>10} hop: {:<2} {} time: {:.4}s throughput: {:.2}M gates/s",
             num_gates_visited,
+            density,
+            num_nonzeros,
             num_gates_visited_here,
+            method,
             duration.as_secs_f32(),
             throughput
         );
 
         num_gates_visited += num_gates_visited_here;
         num_gate_apps += num_gate_apps_here;
+        prev_num_nonzeros = num_nonzeros;
+        num_nonzeros = new_num_nonzeros;
         state = new_state;
     });
 
-    //let final_density = {
-    //    let max_num_states: u64 = 1 << num_qubits;
-    //    num_nonzeros as f64 / max_num_states as f64
-    //};
+    let final_density = {
+        let max_num_states: u64 = 1 << num_qubits;
+        num_nonzeros as f64 / max_num_states as f64
+    };
 
     println!(
-        "gate: {:<2} \ngate app count: {}, time: {}s",
+        "gate: {:<2} density: {:.8} nonzero: {:>10}\ngate app count: {}, time: {}s",
         num_gates_visited,
-        //final_density,
-        //num_nonzeros,
+        final_density,
+        num_nonzeros,
         num_gate_apps,
         duration.as_secs_f32()
     );
