@@ -1,6 +1,8 @@
-use crate::config::Config;
 use crate::utility::is_zero;
+use crate::{config::Config, simulator::Compactifiable};
 use nalgebra::*;
+
+use super::state::State;
 
 use crate::{
     circuit::{Gate, GateDefn, Unitary, UnitaryMatrix},
@@ -35,6 +37,115 @@ impl MPSState {
             .unzip();
 
         Self {
+            tensors,
+            bond_dims,
+            n_sites: num_qubits,
+        }
+    }
+
+    pub fn from_nonzeros<B: BasisIdx>(
+        config: &Config,
+        prev_state: State<B>,
+        num_qubits: usize,
+    ) -> Self {
+        // Construct dense state psi from the non-zero basis indices
+        // NB: requires expensive 2^n array construction!
+        let mut psi: Vec<Complex> = vec![Complex::new(0.0, 0.0); 1 << num_qubits];
+        for (bidx, ampl) in prev_state.compactify() {
+            psi[bidx.as_idx()] += ampl;
+        }
+
+        let mut tensors: Vec<(DMatrix<Complex>, DMatrix<Complex>)> = Vec::with_capacity(num_qubits);
+        let mut bond_dims: Vec<(usize, usize)> = Vec::with_capacity(num_qubits);
+
+        // Process left-most site
+        let mut bond_left = 1;
+        for site in 0..(num_qubits - 1) {
+            let bond_right = psi.len() / (bond_left * 2);
+
+            let mut matrix = DMatrix::from_fn(bond_left * 2, bond_right, |row, col| {
+                let index = row + col * bond_left * 2;
+                psi[index]
+            });
+            let svd = matrix.svd(true, true);
+            let mut u = svd.u.unwrap();
+            let sigmas = &svd.singular_values;
+            let mut vt = svd.v_t.unwrap();
+
+            let chi = sigmas.len().min(config.bond_dimension_threshold);
+
+            // distribute sigmas symmetrically
+            for i in 0..chi {
+                let sqrt_sigma = sigmas[i].sqrt();
+                u.column_mut(i).scale_mut(sqrt_sigma);
+                vt.row_mut(i).scale_mut(sqrt_sigma);
+            }
+
+            // Convert U into two separate matrices for |0> and |1> on this site.
+            // We have shape (bond_dim_left*2, chi). We'll cut that into 2 blocks of size
+            // (bond_dim_left, chi) each: one for the |0> amplitude, one for the |1> amplitude.
+            let mut tensor_0 = DMatrix::zeros(bond_left, chi);
+            let mut tensor_1 = DMatrix::zeros(bond_left, chi);
+
+            for row in 0..(bond_left * 2) {
+                let alpha_left = row / 2; // which row in [0..bond_dim_left)
+                let i = row % 2; // 0 => |0>, 1 => |1>
+                for col in 0..chi {
+                    if i == 0 {
+                        tensor_0[(alpha_left, col)] = u[(row, col)];
+                    } else {
+                        tensor_1[(alpha_left, col)] = u[(row, col)];
+                    }
+                }
+            }
+
+            tensors.push((tensor_0, tensor_1));
+            bond_dims.push((bond_left, chi));
+
+            // Now form the new "psi" as (chi x dim_right) = (v_trunc) in column-major flatten
+            // We'll keep it as a DVector for the next iteration.
+            // The next left bond dimension is chi
+            bond_left = chi;
+
+            let new_len = chi * bond_right;
+            let mut new_psi: Vec<Complex> = vec![Complex::new(0.0, 0.0); new_len];
+
+            for row in 0..chi {
+                for col in 0..bond_right {
+                    let val = vt[(row, col)];
+                    new_psi[row + col * chi] = val;
+                }
+            }
+
+            psi = new_psi;
+        }
+
+        // Finally, the last site (n_sites - 1).
+        // Here we have a vector of length bond_dim_left * 2 (the last site's dimension),
+        // because there's only 1 leftover dimension on the right side.
+        {
+            let dim = psi.len();
+            assert_eq!(dim, bond_left * 2);
+
+            let mut tensor_0 = DMatrix::zeros(bond_left, 1);
+            let mut tensor_1 = DMatrix::zeros(bond_left, 1);
+
+            // Distribute the final pieces
+            for row in 0..dim {
+                let alpha_left = row / 2;
+                let i = row % 2;
+                if i == 0 {
+                    tensor_0[(alpha_left, 0)] = psi[row];
+                } else {
+                    tensor_1[(alpha_left, 0)] = psi[row];
+                }
+            }
+
+            tensors.push((tensor_0, tensor_1));
+            bond_dims.push((bond_left, 1));
+        }
+
+        MPSState {
             tensors,
             bond_dims,
             n_sites: num_qubits,
