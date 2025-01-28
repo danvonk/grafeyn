@@ -11,7 +11,14 @@
         pkgs = import nixpkgs { inherit system; };
         naersk-lib = pkgs.callPackage naersk { };
       in {
-        defaultPackage = naersk-lib.buildPackage ./.;
+        defaultPackage = naersk-lib.buildPackage {
+          nativeBuildInputs = with pkgs; [
+            futhark
+            jemalloc
+            rust-jemalloc-sys
+          ];
+          src = ./.;
+        };
         devShell = with pkgs;
           mkShell {
             buildInputs = [
