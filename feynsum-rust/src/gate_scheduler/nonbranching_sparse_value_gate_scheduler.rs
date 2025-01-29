@@ -16,15 +16,18 @@ impl<'a> GateScheduler for NonBranchingSparseValueGateScheduler<'a> {
     fn pick_next_gates(&mut self) -> Vec<GateIndex> {
         let mut next_gates = Vec::<GateIndex>::new();
         let mut selection: GateIndex;
+        let mut next_gi: GateIndex;
+        let mut num_branches: usize = 0;
 
-        'pool: for _ in 0..self.num_of_next_gates {
+        'pool: while num_branches < self.num_of_next_gates {
             selection = match self.first_ok_touch() {
                 Some(x) => x,
                 None => break 'pool,
             };
 
             for qi in 0..self.num_qubits {
-                let next_gi = self.frontier[qi];
+                next_gi = self.frontier[qi];
+
                 if next_gi < self.num_gates
                     && utility::okay_to_visit(
                         self.num_gates,
@@ -32,10 +35,21 @@ impl<'a> GateScheduler for NonBranchingSparseValueGateScheduler<'a> {
                         &self.frontier,
                         next_gi,
                     )
-                    && self.sparsity[next_gi] < self.sparsity[selection]
-                    && !self.gate_is_branching[next_gi]
                 {
-                    selection = next_gi;
+                    selection = match (
+                        self.sparsity[selection] > self.sparsity[next_gi],
+                        self.gate_is_branching[selection],
+                        self.gate_is_branching[next_gi],
+                    ) {
+                        (false, false, false) => next_gi,
+                        (false, false, true) => selection, //next_gi if sparsity is valued over branching
+                        (false, true, false) => next_gi,
+                        (false, true, true) => next_gi,
+                        (true, false, false) => selection,
+                        (true, false, true) => selection,
+                        (true, true, false) => next_gi, //selection if sparsity is valued over branching
+                        (true, true, true) => selection,
+                    };
                 }
             }
 
@@ -45,6 +59,10 @@ impl<'a> GateScheduler for NonBranchingSparseValueGateScheduler<'a> {
                 &mut self.frontier,
                 selection,
             );
+
+            if self.gate_is_branching[selection] {
+                num_branches += 1;
+            }
 
             next_gates.push(selection);
         }
@@ -69,22 +87,24 @@ impl<'a> NonBranchingSparseValueGateScheduler<'a> {
             num_qubits,
             gate_touches,
             gate_is_branching,
-            num_of_next_gates: 3,
+            num_of_next_gates: 2,
             sparsity,
         }
     }
 
     fn first_ok_touch(&mut self) -> Option<GateIndex> {
+        let mut next_gi: GateIndex;
         for qi in 0..self.num_qubits {
-            if self.frontier[qi] < self.num_gates
+            next_gi = self.frontier[qi];
+            if next_gi < self.num_gates
                 && utility::okay_to_visit(
                     self.num_gates,
                     &self.gate_touches,
                     &self.frontier,
-                    self.frontier[qi],
+                    next_gi,
                 )
             {
-                return Some(self.frontier[qi]);
+                return Some(next_gi);
             }
         }
 
