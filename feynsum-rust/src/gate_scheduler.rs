@@ -107,7 +107,7 @@ pub fn create_gate_scheduler<'a, B: BasisIdx>(
             ))
         }
         GateSchedulingPolicy::NonBranchingSparseValue => {
-            log::info!("using greedy sparsity value gate scheduler");
+            log::info!("using nonbranching sparse value gate scheduler");
             Box::new(NonBranchingSparseValueGateScheduler::new(
                 num_gates,
                 num_qubits,
