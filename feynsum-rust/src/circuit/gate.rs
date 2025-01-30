@@ -25,7 +25,7 @@ enum BranchingType {
 }
 
 #[derive(Debug, Clone)]
-#[allow(clippy::upper_case_acronyms)]
+#[allow(clippy::upper_case_acronyms, dead_code)]
 pub enum GateDefn {
     CCX {
         control1: QubitIndex,
