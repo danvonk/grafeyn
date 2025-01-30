@@ -1,10 +1,10 @@
 use atomic_float::AtomicF32;
-use num::complex;
+use num_complex::Complex32;
 
 pub type QubitIndex = usize;
 pub type GateIndex = usize;
 pub type Real = f32;
-pub type Complex = complex::Complex<Real>;
+pub type Complex = Complex32;
 
 // used to store weights in the concurrent hash table
 pub type AtomicReal = AtomicF32;
