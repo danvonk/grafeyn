@@ -8,17 +8,20 @@ use crate::types::BasisIdx;
 mod greedy_finish_qubit_gate_scheduler;
 mod greedy_nonbranching_gate_scheduler;
 mod naive_gate_scheduler;
+mod nonbranching_sparse_value_gate_scheduler;
 mod utility;
 
 pub use greedy_finish_qubit_gate_scheduler::GreedyFinishQubitGateScheduler;
 pub use greedy_nonbranching_gate_scheduler::GreedyNonbranchingGateScheduler;
 pub use naive_gate_scheduler::NaiveGateScheduler;
+pub use nonbranching_sparse_value_gate_scheduler::NonBranchingSparseValueGateScheduler;
 
 #[derive(Debug, Copy, Clone)]
 pub enum GateSchedulingPolicy {
     Naive,
     GreedyNonbranching,
     GreedyFinishQubit,
+    NonBranchingSparseValue,
 }
 
 impl FromStr for GateSchedulingPolicy {
@@ -29,8 +32,9 @@ impl FromStr for GateSchedulingPolicy {
             "naive" => Ok(GateSchedulingPolicy::Naive),
             "greedy-nonbranching" | "gnb" => Ok(GateSchedulingPolicy::GreedyNonbranching),
             "greedy-finish-qubit" | "gfq" => Ok(GateSchedulingPolicy::GreedyFinishQubit),
+            "greedy-sparsity" | "nbsv" => Ok(GateSchedulingPolicy::NonBranchingSparseValue),
             _ => Err(format!(
-                "unknown gate scheduling policy: {}; valid values are: naive, gnb, fgq",
+                "unknown gate scheduling policy: {}; valid values are: naive, gnb, gfq, nbsv",
                 s
             )),
         }
@@ -43,6 +47,9 @@ impl Display for GateSchedulingPolicy {
             GateSchedulingPolicy::Naive => write!(f, "naive"),
             GateSchedulingPolicy::GreedyNonbranching => write!(f, "greedy-nonbranching"),
             GateSchedulingPolicy::GreedyFinishQubit => write!(f, "greedy-finish-qubit"),
+            GateSchedulingPolicy::NonBranchingSparseValue => {
+                write!(f, "non-branching-sparse-value")
+            }
         }
     }
 }
@@ -70,6 +77,11 @@ pub fn create_gate_scheduler<'a, B: BasisIdx>(
         .iter()
         .map(|gate| gate.is_branching())
         .collect();
+    let gate_sparsities: Vec<_> = circuit
+        .gates
+        .iter()
+        .map(|gate| gate.sparse_value())
+        .collect();
 
     match gate_scheduling_policy {
         GateSchedulingPolicy::Naive => {
@@ -87,11 +99,21 @@ pub fn create_gate_scheduler<'a, B: BasisIdx>(
             ))
         }
         GateSchedulingPolicy::GreedyFinishQubit => {
-            log::info!("using greedy nonbranching gate scheduler");
+            log::info!("using greedy finish qubit gate scheduler");
             Box::new(GreedyFinishQubitGateScheduler::new(
                 num_gates,
                 num_qubits,
                 gate_touches,
+            ))
+        }
+        GateSchedulingPolicy::NonBranchingSparseValue => {
+            log::info!("using nonbranching sparse value gate scheduler");
+            Box::new(NonBranchingSparseValueGateScheduler::new(
+                num_gates,
+                num_qubits,
+                gate_touches,
+                gate_is_branching,
+                gate_sparsities,
             ))
         }
     }

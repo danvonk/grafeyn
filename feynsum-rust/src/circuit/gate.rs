@@ -130,6 +130,76 @@ impl<B: BasisIdx> Gate<B> {
         // NOTE: We assume MaybeBranching as Branching
     }
 
+    //In Percent how many values of Matrix are 0
+    pub fn sparse_value(&self) -> usize {
+        match self.defn {
+            GateDefn::CCX {
+                control1: _,
+                control2: _,
+                target: _,
+            } => 87,
+            GateDefn::CPhase {
+                control: _,
+                target: _,
+                rot: _,
+            } => 75,
+            GateDefn::CSwap {
+                control: _,
+                target1: _,
+                target2: _,
+            } => 87,
+            GateDefn::CX {
+                control: _,
+                target: _,
+            } => 75,
+            GateDefn::CZ {
+                control: _,
+                target: _,
+            } => 75,
+            GateDefn::FSim {
+                left: _,
+                right: _,
+                theta: t,
+                phi: _,
+            } => {
+                if t == 0f32 {
+                    75
+                } else {
+                    63
+                }
+            }
+            GateDefn::Hadamard(_) => 0,
+            GateDefn::Phase { rot: _, target: _ } => 50,
+            GateDefn::RX { rot: _, target: _ } => 50,
+            GateDefn::RY { rot: _, target: _ } => 50,
+            GateDefn::RZ { rot: _, target: _ } => 50,
+            GateDefn::S(_) => 50,
+            GateDefn::Sdg(_) => 50,
+            GateDefn::Swap {
+                target1: _,
+                target2: _,
+            } => 75,
+            GateDefn::SqrtX(_) => 0,
+            GateDefn::SqrtXdg(_) => 0,
+            GateDefn::T(_) => 50,
+            GateDefn::Tdg(_) => 50,
+            GateDefn::U {
+                target: _,
+                theta: _,
+                phi: _,
+                lambda: _,
+            } => 0,
+            GateDefn::X(_) => 50,
+            GateDefn::PauliY(_) => 50,
+            GateDefn::PauliZ(_) => 50,
+            GateDefn::Other {
+                name: _,
+                params: _,
+                args: _,
+            } => 100,
+        }
+    }
+
     // TODO: refactor to make this always consistent with pull_apply
     pub fn is_pullable(&self) -> bool {
         self.pull_action.is_some()
