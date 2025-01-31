@@ -41,6 +41,9 @@ pub struct Options {
     #[structopt(long = "pull-threshold", default_value = "0.8")]
     pub pull_threshold: Real,
 
+    #[structopt(long = "bond-dimension-threshold", default_value = "100")]
+    pub bond_dimension_threshold: usize,
+
     #[structopt(long = "disable-gate-fusion")]
     pub disable_gate_fusion: bool,
 

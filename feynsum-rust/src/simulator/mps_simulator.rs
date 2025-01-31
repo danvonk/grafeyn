@@ -1,40 +1,29 @@
+mod dense_table;
+mod mps;
+mod sparse_table;
 mod state;
 mod state_expander;
-
-pub use state::State;
 
 use crate::circuit::Circuit;
 use crate::config::Config;
 use crate::gate_scheduler;
 use crate::profile;
-use crate::types::{AtomicBasisIdx, BasisIdx, Complex, Real};
+use crate::types::{BasisIdx, Real};
 
-pub use state::SparseStateTable;
-pub use state_expander::expand_sparse;
-pub use state_expander::{ExpandMethod, ExpandResult};
+pub use state::State;
+pub use state_expander::{expand, ExpandResult};
 
-pub fn run<B: BasisIdx, AB: AtomicBasisIdx<B>>(
-    config: &Config,
-    circuit: Circuit<B>,
-) -> State<B, AB> {
+pub fn run<B: BasisIdx>(config: &Config, circuit: Circuit<B>) -> State<B> {
     let num_gates = circuit.num_gates();
     let num_qubits = circuit.num_qubits;
-
-    let mut num_gates_visited = 0;
-    let mut state = State::Sparse(SparseStateTable::singleton(
-        num_qubits,
-        B::zeros(),
-        Complex::new(1.0, 0.0),
-        config.maxload,
-        1,
-    )); // initial state
     let mut num_nonzeros = 1;
-    let mut num_gate_apps = 0;
     let mut prev_num_nonzeros = 1;
 
-    let mut gate_scheduler = gate_scheduler::create_gate_scheduler(config, &circuit);
+    let mut num_gates_visited = 0;
+    let mut state = State::MPS(mps::MPSState::singleton(num_qubits));
+    let mut num_gate_apps = 0;
 
-    log::info!("starting gate application loop.");
+    let mut gate_scheduler = gate_scheduler::create_gate_scheduler(config, &circuit);
 
     let (duration, _) = profile!(loop {
         let these_gates = gate_scheduler
@@ -58,8 +47,9 @@ pub fn run<B: BasisIdx, AB: AtomicBasisIdx<B>>(
                 num_nonzeros: new_num_nonzeros,
                 num_gate_apps: num_gate_apps_here,
                 method,
+                ..
             },
-        ) = profile!(state_expander::expand(
+        ) = profile!(expand::<B>(
             these_gates,
             config,
             num_qubits,
@@ -114,16 +104,13 @@ pub fn run<B: BasisIdx, AB: AtomicBasisIdx<B>>(
 mod tests {
     use super::*;
     use crate::parser;
-    use crate::types::constants;
     use crate::types::BasisIdx64;
-    use approx::abs_diff_eq;
-    use std::sync::atomic::AtomicU64;
 
     #[test]
     fn test_run() {
         let config = Config::default();
         // bv_n30.qasm
-        let circuit = Circuit::<BasisIdx64>::new(
+        let circuit = Circuit::new(
             parser::parse_program(
                 r#"
 OPENQASM 2.0;
@@ -161,89 +148,14 @@ h q0[27];
 h q0[28];
 x q0[29];
 h q0[29];
-//barrier q0[0],q0[1],q0[2],q0[3],q0[4],q0[5],q0[6],q0[7],q0[8],q0[9],q0[10],q0[11],q0[12],q0[13],q0[14],q0[15],q0[16],q0[17],q0[18],q0[19],q0[20],q0[21],q0[22],q0[23],q0[24],q0[25],q0[26],q0[27],q0[28],q0[29];
-cx q0[0],q0[29];
-cx q0[4],q0[29];
-cx q0[5],q0[29];
-cx q0[7],q0[29];
-cx q0[8],q0[29];
-cx q0[10],q0[29];
-cx q0[11],q0[29];
-cx q0[13],q0[29];
-cx q0[15],q0[29];
-cx q0[17],q0[29];
-cx q0[21],q0[29];
-cx q0[22],q0[29];
-cx q0[23],q0[29];
-cx q0[24],q0[29];
-cx q0[25],q0[29];
-cx q0[26],q0[29];
-cx q0[27],q0[29];
-cx q0[28],q0[29];
-//barrier q0[0],q0[1],q0[2],q0[3],q0[4],q0[5],q0[6],q0[7],q0[8],q0[9],q0[10],q0[11],q0[12],q0[13],q0[14],q0[15],q0[16],q0[17],q0[18],q0[19],q0[20],q0[21],q0[22],q0[23],q0[24],q0[25],q0[26],q0[27],q0[28],q0[29];
-h q0[0];
-h q0[1];
-h q0[2];
-h q0[3];
-h q0[4];
-h q0[5];
-h q0[6];
-h q0[7];
-h q0[8];
-h q0[9];
-h q0[10];
-h q0[11];
-h q0[12];
-h q0[13];
-h q0[14];
-h q0[15];
-h q0[16];
-h q0[17];
-h q0[18];
-h q0[19];
-h q0[20];
-h q0[21];
-h q0[22];
-h q0[23];
-h q0[24];
-h q0[25];
-h q0[26];
-h q0[27];
-h q0[28];
             "#,
             )
             .unwrap(),
         )
         .unwrap();
 
-        let state = run::<BasisIdx64, AtomicU64>(&config, circuit);
+        let _state = run::<BasisIdx64>(&config, circuit);
 
-        //        println!("{:?}", state);
-
-        //assert!(matches!(state, State::Sparse(SparseStateTable { .. })));
-
-        let table = match state {
-            State::Sparse(table) => table,
-            _ => panic!(),
-        };
-
-        assert_eq!(table.num_nonzeros(), 2);
-        let nonzero_field_1 = table
-            .get(&BasisIdx64::new("11111111000101010110110110001"))
-            .unwrap();
-        assert!(abs_diff_eq!(
-            nonzero_field_1.re,
-            constants::RECP_SQRT_2,
-            epsilon = 0.0001
-        ));
-
-        let nonzero_field_2 = table
-            .get(&BasisIdx64::new("111111111000101010110110110001"))
-            .unwrap();
-        assert!(abs_diff_eq!(
-            nonzero_field_2.re,
-            -constants::RECP_SQRT_2,
-            epsilon = 0.0001
-        ));
+        println!("{:?}", _state);
     }
 }

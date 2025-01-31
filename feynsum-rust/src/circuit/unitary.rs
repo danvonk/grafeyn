@@ -11,6 +11,7 @@ pub struct UnitaryMatrix {
 }
 pub trait Unitary {
     fn unitary(&self) -> UnitaryMatrix;
+    fn unitary_rev(&self) -> UnitaryMatrix;
 }
 
 impl<B: BasisIdx> Unitary for Gate<B> {
@@ -74,6 +75,7 @@ impl<B: BasisIdx> Unitary for Gate<B> {
                 }
             }
             GateDefn::CX { control, target } => {
+                // Unusually: second qubit controls the flipping of first qubit
                 let mat = dmatrix![
                     Complex::new(1.0, 0.0), Complex::new(0.0, 0.0), Complex::new(0.0, 0.0), Complex::new(0.0, 0.0);
                     Complex::new(0.0, 0.0), Complex::new(0.0, 0.0), Complex::new(0.0, 0.0), Complex::new(1.0, 0.0);
@@ -302,6 +304,25 @@ impl<B: BasisIdx> Unitary for Gate<B> {
                 }
             }
             GateDefn::Other { .. } => panic!("unsupported gate {:?}", self),
+        }
+    }
+
+    fn unitary_rev(&self) -> UnitaryMatrix {
+        match &self.defn {
+            GateDefn::CX { control, target } => {
+                // The standard "textbook" CX where first qubit is control
+                let mat = dmatrix![
+                    Complex::new(1.0, 0.0), Complex::new(0.0, 0.0), Complex::new(0.0, 0.0), Complex::new(0.0, 0.0);
+                    Complex::new(0.0, 0.0), Complex::new(1.0, 0.0), Complex::new(0.0, 0.0), Complex::new(0.0, 0.0);
+                    Complex::new(0.0, 0.0), Complex::new(0.0, 0.0), Complex::new(0.0, 0.0), Complex::new(1.0, 0.0);
+                    Complex::new(0.0, 0.0), Complex::new(0.0, 0.0), Complex::new(1.0, 0.0), Complex::new(0.0, 0.0);
+                ];
+                UnitaryMatrix {
+                    mat,
+                    qubit_indices: vec![*control, *target],
+                }
+            }
+            _ => self.unitary(),
         }
     }
 }
